@@ -7,10 +7,12 @@
 #include <SPI.h>
 #include <Seeed_FS.h>
 #include "SD/Seeed_SD.h"
-#include <string>     // std::string, std::to_string
+#include "RTC_SAMD51.h"
+#include "DateTime.h"
 
 
 File myFile;
+RTC_SAMD51 rtc;
 
 MPU6050 mpu;
 
@@ -35,6 +37,8 @@ int distance; // distance
 
 void setup()
 {
+
+
   pinMode(WIO_MIC, INPUT);
   pinMode(shockSensorPin, INPUT);
   shockSensorSate = digitalRead(shockSensorPin);
@@ -45,7 +49,27 @@ void setup()
 
   Serial.begin(115200);
   while (!Serial); // Wait for Serial to be ready
+  rtc.begin();
 
+
+  DateTime now = DateTime(F(__DATE__), F(__TIME__));
+  Serial.println("adjust time!");
+  rtc.adjust(now);
+
+  now = rtc.now();
+
+  Serial.print(now.year(), DEC);
+  Serial.print('/');
+  Serial.print(now.month(), DEC);
+  Serial.print('/');
+  Serial.print(now.day(), DEC);
+  Serial.print(" ");
+  Serial.print(now.hour(), DEC);
+  Serial.print(':');
+  Serial.print(now.minute(), DEC);
+  Serial.print(':');
+  Serial.print(now.second(), DEC);
+  Serial.println();
   //initWifi();
 
 
@@ -229,10 +253,15 @@ Vector imu()
 */
 void write_file(int db, int dist, Vector rawGyro) {
 
+  DateTime now = DateTime(F(__DATE__), F(__TIME__));
+  rtc.adjust(now);
+
+  now = rtc.now();
+
   myFile = SD.open("microphone.txt", FILE_APPEND);
   if (myFile)
   {
-    myFile.print(String(db));
+    myFile.print(String(db) + ";" + now.year() + "/" + now.month() + "/" + now.day() + " " + now.hour() + ":" + now.minute() + ":" + now.second());
     myFile.println("");
     myFile.close();
   }
@@ -243,7 +272,7 @@ void write_file(int db, int dist, Vector rawGyro) {
   if (myFile)
   {
 
-    myFile.print(String(dist));
+    myFile.print(String(dist) + ";" + now.year() + "/" + now.month() + "/" + now.day() + " " + now.hour() + ":" + now.minute() + ":" + now.second());
     myFile.println("");
     myFile.close();
   }
@@ -254,7 +283,7 @@ void write_file(int db, int dist, Vector rawGyro) {
   if (myFile)
   {
     Serial.println(String(rawGyro.XAxis));
-    myFile.print(String(rawGyro.XAxis)+";"+String(rawGyro.YAxis)+";"+String(rawGyro.ZAxis));
+    myFile.print(String(rawGyro.XAxis) + ";" + String(rawGyro.YAxis) + ";" + String(rawGyro.ZAxis) + ";" + now.year() + "/" + now.month() + "/" + now.day() + " " + now.hour() + ":" + now.minute() + ":" + now.second());
     myFile.println("");
     myFile.close();
   }
