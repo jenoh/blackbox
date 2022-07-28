@@ -1,14 +1,22 @@
+//#include <DateTime.h>
 #include <Wire.h>
 #include <rpcWiFi.h>
 #include <MPU6050.h>
 #include "Ultrasonic.h"
 #include <HTTPClient.h>
+#include <SPI.h>
+#include <Seeed_FS.h>
+#include "SD/Seeed_SD.h"
+#include <string>     // std::string, std::to_string
+
+
+File myFile;
 
 MPU6050 mpu;
 
-const char* ssid = "SFR-bf18";
-const char* password =  "";
-const char* serverName = "";
+//const char* ssid = "iPhone X";
+//const char* password =  "iotiotiot";
+//const char* serverName = "http://d273-163-5-2-42.ngrok.io";
 
 unsigned long lastTime = 0;
 unsigned long timerDelay = 5000;
@@ -38,7 +46,7 @@ void setup()
   Serial.begin(115200);
   while (!Serial); // Wait for Serial to be ready
 
-  initWifi();
+  //initWifi();
 
 
   // Initialize MPU6050
@@ -54,6 +62,17 @@ void setup()
   mpu.setThreshold(3);
 
   checkSettings();
+
+  checkSd();
+}
+
+void checkSd() {
+  Serial.print("Initializing SD card...");
+  if (!SD.begin(SDCARD_SS_PIN, SDCARD_SPI)) {
+    Serial.println("initialization failed!");
+    while (1);
+  }
+  Serial.println("initialization done.");
 }
 
 void checkSettings()
@@ -93,9 +112,9 @@ void checkSettings()
 
   Serial.println();
 }
-
-void initWifi()
-{
+/*
+  void initWifi()
+  {
 
   // Set WiFi to station mode and disconnect from an AP if it was previously connected
   WiFi.mode(WIFI_STA);
@@ -112,10 +131,10 @@ void initWifi()
   Serial.println("Connected to the WiFi network");
   Serial.print("IP Address: ");
   Serial.println (WiFi.localIP()); // prints out the device's IP address
-}
+  }
 
-void scanWifi()
-{
+  void scanWifi()
+  {
   // WiFi.scanNetworks will return the number of networks found
   int n = WiFi.scanNetworks();
   Serial.println("scan done");
@@ -137,7 +156,7 @@ void scanWifi()
     }
   }
   Serial.println("");
-}
+  }*/
 
 int  ultrasons()
 {
@@ -162,7 +181,7 @@ int niveau_sonore()
 {
   int val = analogRead(WIO_MIC);
   Serial.println("Db : ");
-  Serial.println(val);
+  Serial.print(String(val));
   return val;
 }
 
@@ -179,36 +198,74 @@ Vector imu()
 
   return rawGyro;
 }
+/*
+  void post(int dist, int db, Vector rawGyro)
+  {
+  if (WiFi.status() == WL_CONNECTED) {
+    WiFiClient client;
+    HTTPClient http;
 
-void post(int dist, int db, Vector rawGyro)
-{
-    if (WiFi.status() == WL_CONNECTED) {
-      WiFiClient client;
-      HTTPClient http;
+    // Your Domain name with URL path or IP address with path
+    http.begin(client, serverName);
 
-      // Your Domain name with URL path or IP address with path
-      http.begin(client, serverName);
+    // If you need an HTTP request with a content type: application/json, use the following:
+    http.addHeader("Content-Type", "application/json");
 
-      // If you need an HTTP request with a content type: application/json, use the following:
-      http.addHeader("Content-Type", "application/json");      
-      int httpResponseCode = http.POST("{\"imu\": {\"Xraw\": \""+ std::to_string(rawGyro.XAxis)+"\", \"Yraw\": \""+ std::to_string(rawGyro.YAxis)+"\", \"Zraw\": \""+ std::to_string(rawGyro.ZAxis)+"\"}, {\"ultrasons\": {\"cm\": \""+ std::to_string(dist)+"\"},{\"microphone\": {\"db\": \""+ std::to_string(db)+"\"}}");
+    int httpResponseCode = http.POST("{\"imu\": \"toto \" }");
 
-      Serial.print("HTTP Response code: ");
-      Serial.println(httpResponseCode);
+    // int httpResponseCode = http.POST("{\"imu\": {\"Xraw\": \""+ std::to_string(rawGyro.XAxis)+"\", \"Yraw\": \""+ std::to_string(rawGyro.YAxis)+"\", \"Zraw\": \""+ std::to_string(rawGyro.ZAxis)+"\"}, {\"ultrasons\": {\"cm\": \""+ std::to_string(dist)+"\"},{\"microphone\": {\"db\": \""+ std::to_string(db)+"\"}}");
 
-      // Free resources
-      http.end();
-    }
-    else {
-      Serial.println("WiFi Disconnected");
-    }
-    lastTime = millis();
+    Serial.print("HTTP Response code: ");
+    Serial.println(httpResponseCode);
+
+    // Free resources
+    http.end();
+  }
+  else {
+    Serial.println("WiFi Disconnected");
+  }
+  lastTime = millis();
+  }
+*/
+void write_file(int db, int dist, Vector rawGyro) {
+
+  myFile = SD.open("microphone.txt", FILE_APPEND);
+  if (myFile)
+  {
+    myFile.print(String(db));
+    myFile.println("");
+    myFile.close();
+  }
+  else
+    Serial.println("Error opening microphone.txt");
+
+  myFile = SD.open("distance.txt", FILE_APPEND);
+  if (myFile)
+  {
+
+    myFile.print(String(dist));
+    myFile.println("");
+    myFile.close();
+  }
+  else
+    Serial.println("Error opening distance.txt");
+
+  myFile = SD.open("gyro.txt", FILE_APPEND);
+  if (myFile)
+  {
+    Serial.println(String(rawGyro.XAxis));
+    myFile.print(String(rawGyro.XAxis)+";"+String(rawGyro.YAxis)+";"+String(rawGyro.ZAxis));
+    myFile.println("");
+    myFile.close();
+  }
+  else
+    Serial.println("Error opening gyro.txt");
 }
 
 void loop()
 {
 
-  Serial.print(shockSensorSate);
+  //Serial.print(shockSensorSate);
 
   /* Capteur ultrasons */
   int dist = ultrasons();
@@ -220,8 +277,10 @@ void loop()
   Vector rawGyro = imu();
 
   /* Post */
-  post(dist, db, rawGyro);
+  //post(dist, db, rawGyro);
+
+  write_file(db, dist, rawGyro);
 
   /* Pause de 1 seconde */
-  delay(3000);
+  delay(10000);
 }
